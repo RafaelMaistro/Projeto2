@@ -1,10 +1,11 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
 
 #define MAX_EMPRESTIMOS 100
 
-// Estruturas para armazenar informações
+
 typedef struct {
   char titulo[50];
   char autor[50];
@@ -18,15 +19,14 @@ typedef struct {
   int num_emprestimos;
 } Usuario;
 
-// Estrutura para armazenar informações dos empréstimos
 typedef struct {
   char usuario[50];
   char livro[50];
   char autor[50];
-  int tipo; // 1 para empréstimo, 2 para devolução
+  int tipo;
+  char dataHora[100];
 } Emprestimo;
 
-// Função para abrir arquivos binários, criando-os se necessário
 FILE *abrirArquivoBinario(const char *nomeArquivo) {
   FILE *file = fopen(nomeArquivo, "rb+");
   if (file == NULL) {
@@ -39,7 +39,6 @@ FILE *abrirArquivoBinario(const char *nomeArquivo) {
   return file;
 }
 
-// Função para abrir arquivo de texto, criando-o se necessário
 FILE *abrirArquivoTexto(const char *nomeArquivo) {
   FILE *file = fopen(nomeArquivo, "a+");
   if (file == NULL) {
@@ -49,11 +48,19 @@ FILE *abrirArquivoTexto(const char *nomeArquivo) {
   return file;
 }
 
-// Função para cadastrar cliente (usuário) com nome e senha
+void obterDataHora(char *buffer, int tamanhoBuffer) {
+  time_t agora;
+  struct tm *infoTempo;
+
+  time(&agora);
+  infoTempo = localtime(&agora);
+  strftime(buffer, tamanhoBuffer, "%d/%m/%Y %H:%M:%S", infoTempo);
+}
+
 void cadastrarUsuario(FILE *fileBin) {
   Usuario usuario;
   printf("Digite o nome do usuário: ");
-  getchar(); // Limpa o buffer
+  getchar();
   fgets(usuario.nome, 50, stdin);
   usuario.nome[strcspn(usuario.nome, "\n")] = 0;
   printf("Digite a senha do usuário: ");
@@ -61,14 +68,12 @@ void cadastrarUsuario(FILE *fileBin) {
   usuario.senha[strcspn(usuario.senha, "\n")] = 0;
   usuario.num_emprestimos = 0;
 
-  fseek(fileBin, 0,
-        SEEK_END); // Vai para o final do arquivo para não sobrescrever
+  fseek(fileBin, 0, SEEK_END);
   fwrite(&usuario, sizeof(Usuario), 1, fileBin);
 
   printf("Usuário cadastrado com sucesso!\n");
 }
 
-// Função para realizar o login do usuário
 int realizarLogin(FILE *fileBinUsuarios, Usuario *usuarioLogado) {
   char nome[50];
   char senha[20];
@@ -84,7 +89,7 @@ int realizarLogin(FILE *fileBinUsuarios, Usuario *usuarioLogado) {
   fgets(senha, 20, stdin);
   senha[strcspn(senha, "\n")] = 0;
 
-  rewind(fileBinUsuarios); // Volta ao início do arquivo
+  rewind(fileBinUsuarios); 
 
   while (fread(&usuario, sizeof(Usuario), 1, fileBinUsuarios)) {
     if (strcmp(usuario.nome, nome) == 0 && strcmp(usuario.senha, senha) == 0) {
@@ -103,23 +108,23 @@ int realizarLogin(FILE *fileBinUsuarios, Usuario *usuarioLogado) {
   return loginBemSucedido;
 }
 
-// Função para cadastrar um livro no arquivo binário
+
 void cadastrarLivro(FILE *fileBin) {
   Livro livro;
   int livroEncontrado = 0;
 
-  // Solicita o nome do livro
+  
   printf("Digite o título do livro: ");
-  getchar(); // Limpa o buffer
+  getchar(); 
   fgets(livro.titulo, 50, stdin);
   livro.titulo[strcspn(livro.titulo, "\n")] = 0;
 
-  // Solicita o nome do autor
+  
   printf("Digite o nome do autor: ");
   fgets(livro.autor, 50, stdin);
   livro.autor[strcspn(livro.autor, "\n")] = 0;
 
-  // Verifica se o livro já existe
+  
   Livro livroExistente;
   rewind(fileBin);
   while (fread(&livroExistente, sizeof(Livro), 1, fileBin)) {
@@ -131,8 +136,7 @@ void cadastrarLivro(FILE *fileBin) {
   }
 
   if (livroEncontrado) {
-    // Se o livro já existir, pergunta quantos exemplares adicionais o usuário
-    // deseja adicionar
+    
     int adicionais;
     printf("O livro \"%s\" de %s já existe. Quantos exemplares adicionais "
            "deseja adicionar? ",
@@ -141,23 +145,23 @@ void cadastrarLivro(FILE *fileBin) {
     livroExistente.num_exemplares += adicionais;
     livroExistente.exemplares_disponiveis += adicionais;
 
-    // Atualiza o registro do livro existente
+    
     fseek(fileBin, -sizeof(Livro), SEEK_CUR);
     fwrite(&livroExistente, sizeof(Livro), 1, fileBin);
     printf("Exemplares adicionados com sucesso!\n");
   } else {
-    // Se o livro não existir, solicita o número de exemplares
+    
     printf("Digite o número de exemplares: ");
     scanf("%d", &livro.num_exemplares);
     livro.exemplares_disponiveis = livro.num_exemplares;
 
-    fseek(fileBin, 0, SEEK_END); // Vai para o final do arquivo
+    fseek(fileBin, 0, SEEK_END); 
     fwrite(&livro, sizeof(Livro), 1, fileBin);
     printf("Livro cadastrado com sucesso!\n");
   }
 }
 
-// Função para listar livros cadastrados
+
 void listarLivros(FILE *fileBin) {
   Livro livro;
   rewind(fileBin);
@@ -174,7 +178,54 @@ void listarLivros(FILE *fileBin) {
   }
 }
 
-// Função para registrar empréstimo
+void excluirLivro(FILE *fileBin) {
+  char tituloLivro[50];
+  char autorLivro[50];
+  Livro livro;
+  FILE *fileBinTemp = fopen("livros_temp.bin", "wb");
+
+  if (fileBinTemp == NULL) {
+    printf("Erro ao criar arquivo temporário para exclusão de livro.\n");
+    return;
+  }
+
+  printf("Digite o título do livro a ser excluído: ");
+  getchar(); 
+  fgets(tituloLivro, 50, stdin);
+  tituloLivro[strcspn(tituloLivro, "\n")] = 0;
+
+  printf("Digite o nome do autor do livro: ");
+  fgets(autorLivro, 50, stdin);
+  autorLivro[strcspn(autorLivro, "\n")] = 0;
+
+  int livroEncontrado = 0;
+  rewind(fileBin);
+
+ 
+  while (fread(&livro, sizeof(Livro), 1, fileBin)) {
+    if (strcmp(livro.titulo, tituloLivro) == 0 &&
+        strcmp(livro.autor, autorLivro) == 0) {
+      livroEncontrado = 1; 
+      printf("Livro \"%s\" de \"%s\" excluído com sucesso!\n", tituloLivro,
+             autorLivro);
+      continue; 
+    }
+    fwrite(&livro, sizeof(Livro), 1,
+           fileBinTemp); 
+  }
+
+  if (!livroEncontrado) {
+    printf("Livro \"%s\" de \"%s\" não encontrado.\n", tituloLivro, autorLivro);
+  }
+
+  fclose(fileBinTemp);
+  fclose(fileBin);
+
+  
+  rename("livros_temp.bin", "livros.bin");
+  fileBin = abrirArquivoBinario("livros.bin"); 
+}
+
 void realizarEmprestimo(FILE *fileBinLivros, FILE *fileBinUsuarios,
                         Usuario *usuarioLogado, Emprestimo *emprestimos,
                         int *numEmprestimos) {
@@ -182,9 +233,10 @@ void realizarEmprestimo(FILE *fileBinLivros, FILE *fileBinUsuarios,
   char autorLivro[50];
   Livro livro;
   int encontradoLivro = 0;
+  char dataHora[100];
 
   printf("Digite o título do livro a ser emprestado: ");
-  getchar(); // Limpa o buffer
+  getchar(); 
   fgets(tituloLivro, 50, stdin);
   tituloLivro[strcspn(tituloLivro, "\n")] = 0;
 
@@ -211,7 +263,7 @@ void realizarEmprestimo(FILE *fileBinLivros, FILE *fileBinUsuarios,
       fseek(fileBinLivros, -sizeof(Livro), SEEK_CUR);
       fwrite(&livro, sizeof(Livro), 1, fileBinLivros);
 
-      // Atualiza o número de empréstimos do usuário no arquivo de usuários
+      
       FILE *fileBinUsuariosTemp = fopen("usuarios.bin", "rb+");
       rewind(fileBinUsuariosTemp);
       Usuario usuarioTemp;
@@ -225,31 +277,35 @@ void realizarEmprestimo(FILE *fileBinLivros, FILE *fileBinUsuarios,
       }
       fclose(fileBinUsuariosTemp);
 
-      // Adiciona registro de empréstimo
+      
+      obterDataHora(dataHora, sizeof(dataHora));
       strcpy(emprestimos[*numEmprestimos].usuario, usuarioLogado->nome);
       strcpy(emprestimos[*numEmprestimos].livro, livro.titulo);
       strcpy(emprestimos[*numEmprestimos].autor, livro.autor);
-      emprestimos[*numEmprestimos].tipo = 1; // Tipo 1 para empréstimo
+      emprestimos[*numEmprestimos].tipo = 1; 
+      strcpy(emprestimos[*numEmprestimos].dataHora, dataHora);
       (*numEmprestimos)++;
 
-      // Grava no arquivo de histórico
+    
       FILE *fileTxtHistoricoTemp = abrirArquivoTexto("historico.txt");
-      fprintf(fileTxtHistoricoTemp, "Usuário %s emprestou o livro %s de %s\n",
+      fprintf(fileTxtHistoricoTemp,
+              "[%s] Usuário %s emprestou o livro %s de %s\n", dataHora,
               usuarioLogado->nome, livro.titulo, livro.autor);
       fclose(fileTxtHistoricoTemp);
 
       printf("Empréstimo realizado com sucesso!\n");
-    } else if (livro.exemplares_disponiveis == 0) {
-      printf("Não há exemplares disponíveis para empréstimo.\n");
+    } else if (usuarioLogado->num_emprestimos >= 3) {
+      printf("Você já atingiu o limite de 3 empréstimos simultâneos!\n");
     } else {
-      printf("Você já alcançou o limite de empréstimos.\n");
+      printf("Não há exemplares disponíveis para o livro \"%s\" no momento.\n",
+             livro.titulo);
     }
   } else {
-    printf("Livro não encontrado.\n");
+    printf("Livro \"%s\" de \"%s\" não encontrado.\n", tituloLivro, autorLivro);
   }
 }
 
-// Função para devolver um livro
+
 void devolverLivro(FILE *fileBinLivros, FILE *fileBinUsuarios,
                    Usuario *usuarioLogado, Emprestimo *emprestimos,
                    int *numEmprestimos) {
@@ -257,9 +313,13 @@ void devolverLivro(FILE *fileBinLivros, FILE *fileBinUsuarios,
   char autorLivro[50];
   Livro livro;
   int encontradoLivro = 0;
+  char dataHora[100];
+  int livroEmprestado =
+      0; 
+  int indiceEmprestimo = -1; 
 
   printf("Digite o título do livro a ser devolvido: ");
-  getchar(); // Limpa o buffer
+  getchar(); 
   fgets(tituloLivro, 50, stdin);
   tituloLivro[strcspn(tituloLivro, "\n")] = 0;
 
@@ -267,7 +327,25 @@ void devolverLivro(FILE *fileBinLivros, FILE *fileBinUsuarios,
   fgets(autorLivro, 50, stdin);
   autorLivro[strcspn(autorLivro, "\n")] = 0;
 
+  
+  for (int i = 0; i < *numEmprestimos; i++) {
+    if (strcmp(emprestimos[i].usuario, usuarioLogado->nome) == 0 &&
+        strcmp(emprestimos[i].livro, tituloLivro) == 0 &&
+        strcmp(emprestimos[i].autor, autorLivro) == 0 &&
+        emprestimos[i].tipo == 1) { 
+      livroEmprestado = 1;
+      indiceEmprestimo = i; 
+      break;
+    }
+  }
+
+  if (!livroEmprestado) {
+    printf("Você não emprestou o livro %s de %s.\n", tituloLivro, autorLivro);
+    return; 
+  }
+
   rewind(fileBinLivros);
+
   while (fread(&livro, sizeof(Livro), 1, fileBinLivros)) {
     if (strcmp(livro.titulo, tituloLivro) == 0 &&
         strcmp(livro.autor, autorLivro) == 0) {
@@ -283,11 +361,10 @@ void devolverLivro(FILE *fileBinLivros, FILE *fileBinUsuarios,
     fseek(fileBinLivros, -sizeof(Livro), SEEK_CUR);
     fwrite(&livro, sizeof(Livro), 1, fileBinLivros);
 
-    // Atualiza o número de empréstimos do usuário no arquivo de usuários
+    
     FILE *fileBinUsuariosTemp = fopen("usuarios.bin", "rb+");
     rewind(fileBinUsuariosTemp);
     Usuario usuarioTemp;
-
     while (fread(&usuarioTemp, sizeof(Usuario), 1, fileBinUsuariosTemp)) {
       if (strcmp(usuarioTemp.nome, usuarioLogado->nome) == 0) {
         usuarioTemp.num_emprestimos = usuarioLogado->num_emprestimos;
@@ -296,144 +373,100 @@ void devolverLivro(FILE *fileBinLivros, FILE *fileBinUsuarios,
         break;
       }
     }
-
     fclose(fileBinUsuariosTemp);
 
-    // Adiciona registro de devolução
-    strcpy(emprestimos[*numEmprestimos].usuario, usuarioLogado->nome);
-    strcpy(emprestimos[*numEmprestimos].livro, livro.titulo);
-    strcpy(emprestimos[*numEmprestimos].autor, livro.autor);
-    emprestimos[*numEmprestimos].tipo = 2; // Tipo 2 para devolução
-    (*numEmprestimos)++;
+    
+    obterDataHora(dataHora, sizeof(dataHora));
+    strcpy(emprestimos[indiceEmprestimo].dataHora, dataHora);
+    emprestimos[indiceEmprestimo].tipo = 2; 
+    printf("O livro %s de %s foi devolvido.\n", tituloLivro, autorLivro);
 
-    // Grava no arquivo de histórico
+    
     FILE *fileTxtHistoricoTemp = abrirArquivoTexto("historico.txt");
-    fprintf(fileTxtHistoricoTemp, "Usuário %s devolveu o livro %s de %s\n",
-            usuarioLogado->nome, livro.titulo, livro.autor);
+    fprintf(fileTxtHistoricoTemp, "[%s] Usuário %s devolveu o livro %s de %s\n",
+            dataHora, usuarioLogado->nome, livro.titulo, livro.autor);
     fclose(fileTxtHistoricoTemp);
 
     printf("Devolução realizada com sucesso!\n");
   } else {
-    printf("Livro não encontrado.\n");
+    printf("Livro %s de %s não encontrado.\n", tituloLivro, autorLivro);
   }
 }
 
-// Função para buscar ou visualizar detalhes de um livro
-void buscarOuVisualizarLivro(FILE *fileBin) {
-  char tituloLivro[50];
-  char autorLivro[50];
-  Livro livro;
-  int encontrado = 0;
 
-  printf("Digite o título do livro a ser buscado: ");
-  getchar(); // Limpa o buffer
-  fgets(tituloLivro, 50, stdin);
-  tituloLivro[strcspn(tituloLivro, "\n")] = 0;
-
-  printf("Digite o nome do autor do livro: ");
-  fgets(autorLivro, 50, stdin);
-  autorLivro[strcspn(autorLivro, "\n")] = 0;
-
-  rewind(fileBin);
-  while (fread(&livro, sizeof(Livro), 1, fileBin)) {
-    if (strcmp(livro.titulo, tituloLivro) == 0 &&
-        strcmp(livro.autor, autorLivro) == 0) {
-      printf("Título: %s | Autor: %s | Exemplares: %d | Disponíveis: %d\n",
-             livro.titulo, livro.autor, livro.num_exemplares,
-             livro.exemplares_disponiveis);
-      encontrado = 1;
-      break; // Sai do loop após encontrar o livro
-    }
-  }
-
-  if (!encontrado) {
-    printf("Nenhum livro encontrado com o título \"%s\" e autor \"%s\".\n",
-           tituloLivro, autorLivro);
-  }
-}
-
-// Função para carregar empréstimos de um arquivo
-void carregarEmprestimos(Emprestimo *emprestimos, int *numEmprestimos) {
-  FILE *fileTxtHistorico = fopen("historico.txt", "r");
-  if (fileTxtHistorico == NULL) {
-    printf("Erro ao abrir arquivo de histórico!\n");
-    return;
-  }
-
-  char linha[200];
+void visualizarHistorico(FILE *fileTxtHistorico) {
+  char linha[256];
+  rewind(fileTxtHistorico);
+  printf("\nHistórico de transações:\n");
   while (fgets(linha, sizeof(linha), fileTxtHistorico)) {
-    // Exclui a nova linha e formata os dados
-    linha[strcspn(linha, "\n")] = 0;
-    sscanf(linha, "Usuário %[^ ] emprestou o livro %[^ ] de %[^ ]",
-           emprestimos[*numEmprestimos].usuario,
-           emprestimos[*numEmprestimos].livro,
-           emprestimos[*numEmprestimos].autor);
-    emprestimos[*numEmprestimos].tipo = 1; // Tipo 1 para empréstimo
-    (*numEmprestimos)++;
+    printf("%s", linha);
   }
-
-  fclose(fileTxtHistorico);
 }
+void listarEmprestimosAtivos(Emprestimo *emprestimos, int numEmprestimos,
+                             Usuario *usuarioLogado) {
+  printf("\nLivros emprestados ainda não devolvidos:\n");
+  int encontrouEmprestimo = 0;
 
-// Função para exibir todos os empréstimos
-void exibirEmprestimos(Emprestimo *emprestimos, int numEmprestimos) {
-  printf("\nEmpréstimos e Devoluções realizados:\n");
   for (int i = 0; i < numEmprestimos; i++) {
-    if (emprestimos[i].tipo == 1) {
-      printf("Empréstimo - Usuário: %s | Livro: %s de %s\n",
-             emprestimos[i].usuario, emprestimos[i].livro,
-             emprestimos[i].autor);
-    } else if (emprestimos[i].tipo == 2) {
-      printf("Devolução - Usuário: %s | Livro: %s de %s\n",
-             emprestimos[i].usuario, emprestimos[i].livro,
-             emprestimos[i].autor);
+    
+    if (strcmp(emprestimos[i].usuario, usuarioLogado->nome) == 0 &&
+        emprestimos[i].tipo == 1) { 
+      printf("Título: %s | Autor: %s | Data e Hora: %s\n", emprestimos[i].livro,
+             emprestimos[i].autor, emprestimos[i].dataHora);
+      encontrouEmprestimo = 1;
     }
   }
+
+  if (!encontrouEmprestimo) {
+    printf("Nenhum livro foi emprestado.\n");
+  }
 }
+
 
 int main() {
   FILE *fileBinLivros = abrirArquivoBinario("livros.bin");
   FILE *fileBinUsuarios = abrirArquivoBinario("usuarios.bin");
+  FILE *fileTxtHistorico = abrirArquivoTexto("historico.txt");
 
+  Usuario usuarioLogado;
   Emprestimo emprestimos[MAX_EMPRESTIMOS];
   int numEmprestimos = 0;
 
-  // Carregar os empréstimos ao iniciar o programa
-  carregarEmprestimos(emprestimos, &numEmprestimos);
+  int opcaoLogin;
+  int opcaoPrincipal;
+  int loginBemSucedido = 0;
 
-  int opcao;
-  Usuario usuarioLogado;
-
-  // Menu de Cadastro
+  
   do {
-    printf("\n--- Menu Inicial ---\n");
+    printf("\nMenu de Login/Cadastro:\n");
     printf("1. Cadastrar Usuário\n");
-    printf("2. Fazer Login\n");
-    printf("0. Sair\n");
+    printf("2. Realizar Login\n");
+    printf("3. Sair\n");
     printf("Escolha uma opção: ");
-    scanf("%d", &opcao);
+    scanf("%d", &opcaoLogin);
 
-    switch (opcao) {
+    switch (opcaoLogin) {
     case 1:
       cadastrarUsuario(fileBinUsuarios);
       break;
     case 2:
-      // Menu de Login
-      if (realizarLogin(fileBinUsuarios, &usuarioLogado)) {
-        // Menu Principal após login
+      loginBemSucedido = realizarLogin(fileBinUsuarios, &usuarioLogado);
+      if (loginBemSucedido) {
+        
         do {
-          printf("\n--- Menu Principal ---\n");
+          printf("\nMenu Principal:\n");
           printf("1. Cadastrar Livro\n");
           printf("2. Listar Livros\n");
-          printf("3. Realizar Empréstimo\n");
-          printf("4. Devolver Livro\n");
-          printf("5. Buscar Livro\n");
-          printf("6. Exibir Todos os Empréstimos\n");
-          printf("0. Sair\n");
+          printf("3. Excluir Livro\n");
+          printf("4. Realizar Empréstimo\n");
+          printf("5. Devolver Livro\n");
+          printf("6. Visualizar Histórico\n");
+          printf("7. Listar Empréstimos Ativos\n"); 
+          printf("8. Sair\n");
           printf("Escolha uma opção: ");
-          scanf("%d", &opcao);
+          scanf("%d", &opcaoPrincipal);
 
-          switch (opcao) {
+          switch (opcaoPrincipal) {
           case 1:
             cadastrarLivro(fileBinLivros);
             break;
@@ -441,28 +474,44 @@ int main() {
             listarLivros(fileBinLivros);
             break;
           case 3:
+            excluirLivro(fileBinLivros);
+            break;
+          case 4:
             realizarEmprestimo(fileBinLivros, fileBinUsuarios, &usuarioLogado,
                                emprestimos, &numEmprestimos);
             break;
-          case 4:
+          case 5:
             devolverLivro(fileBinLivros, fileBinUsuarios, &usuarioLogado,
                           emprestimos, &numEmprestimos);
             break;
-          case 5:
-            buscarOuVisualizarLivro(fileBinLivros);
-            break;
           case 6:
-            exibirEmprestimos(emprestimos, numEmprestimos);
+            visualizarHistorico(fileTxtHistorico);
             break;
+          case 7:
+            listarEmprestimosAtivos(
+                emprestimos, numEmprestimos,
+                &usuarioLogado); 
+            break;
+          case 8:
+            printf("Saindo do menu principal...\n");
+            break;
+          default:
+            printf("Opção inválida. Tente novamente.\n");
           }
-        } while (opcao != 0);
+        } while (opcaoPrincipal != 8);
       }
       break;
+    case 3:
+      printf("Saindo...\n");
+      break;
+    default:
+      printf("Opção inválida. Tente novamente.\n");
     }
-  } while (opcao != 0);
+  } while (opcaoLogin != 3 && !loginBemSucedido);
 
   fclose(fileBinLivros);
   fclose(fileBinUsuarios);
+  fclose(fileTxtHistorico);
 
   return 0;
 }
